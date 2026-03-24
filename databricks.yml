@@ -6,7 +6,12 @@ bundle:
   name: bsg-creditcard-fraud-pipeline
 
 include:
-  - ./resources/*.yml
+  - ./resources/pipeline_job.yml
+
+sync:
+  include:
+    - ./src
+    - ./conf
 
 variables:
   environment:
