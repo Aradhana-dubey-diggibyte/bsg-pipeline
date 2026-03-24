@@ -8,14 +8,31 @@ bundle:
 include:
   - ./resources/*.yml
 
+variables:
+  environment:
+    description: "Environment name"
+    default: "dev"
+  
+  workspace_path:
+    description: "Workspace path for pipeline files"
+    default: "Shared/.bundle/bsg-creditcard-fraud-pipeline"
+
 targets:
   dev:
+    variables:
+      environment: "dev"
+      workspace_path: "Shared/.bundle/bsg-creditcard-fraud-pipeline/dev"
+    
     workspace:
       host: "https://adb-7488500312027058.18.azuredatabricks.net"
       profile: "DEFAULT"
       root_path: "/Shared/.bundle/bsg-creditcard-fraud-pipeline/dev/${workspace.current_user.userName}"
 
   prod:
+    variables:
+      environment: "prod"
+      workspace_path: "Shared/.bundle/bsg-creditcard-fraud-pipeline/prod"
+    
     workspace:
       host: "https://dbc-629d7ac5-f465.cloud.databricks.com"
       profile: "DEFAULT"
