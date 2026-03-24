@@ -1,0 +1,97 @@
+## Silver Layer Job - Data Quality & Feature Engineering
+## Includes: Deduplication, Standardization, PII Masking, Feature Engineering
+## Dependencies: bronze_job
+
+resources:
+  jobs:
+    silver_job:
+      name: "creditcard-${environment}-silver"
+      description: "Silver Layer: Data cleaning, standardization, PII masking, feature engineering"
+      
+      tasks:
+        # Silver Phase 1: Deduplication
+        - task_key: "silver_dedup"
+          description: "Remove duplicate transactions"
+          
+          spark_python_task:
+            python_file: "dbfs:/Workspace/${workspace_path}/src/02_silver_dedup.py"
+            parameters:
+              - "dbfs:/Workspace/${workspace_path}/src/bronze/creditcard_bronze"
+              - "dbfs:/Workspace/${workspace_path}/src/silver"
+              - "${environment}"
+          
+          existing_cluster_id: "0422-125216-1t83bm6v"
+          timeout_seconds: 900
+          max_retries: 2
+          
+
+
+        # Silver Phase 2: Standardization
+        - task_key: "silver_standardize"
+          description: "Normalize amounts, create time features"
+          
+          spark_python_task:
+            python_file: "dbfs:/Workspace/${workspace_path}/src/03_silver_standardise.py"
+            parameters:
+              - "dbfs:/Workspace/${workspace_path}/src/silver/creditcard_silver_dedup"
+              - "dbfs:/Workspace/${workspace_path}/src/silver"
+              - "${environment}"
+          
+          existing_cluster_id: "0422-125216-1t83bm6v"
+          timeout_seconds: 900
+          max_retries: 2
+          
+          depends_on:
+            - task_key: "silver_dedup"
+              outcome: "SUCCEEDED"
+
+        # Silver Phase 3: PII Masking
+        - task_key: "silver_mask"
+          description: "Apply data governance and PII masking"
+          
+          spark_python_task:
+            python_file: "dbfs:/Workspace/${workspace_path}/src/04_silver_pii_mask.py"
+            parameters:
+              - "dbfs:/Workspace/${workspace_path}/src/silver/creditcard_silver_standardized"
+              - "dbfs:/Workspace/${workspace_path}/src/silver"
+              - "${environment}"
+          
+          existing_cluster_id: "0422-125216-1t83bm6v"
+          timeout_seconds: 600
+          max_retries: 1
+          
+          depends_on:
+            - task_key: "silver_standardize"
+              outcome: "SUCCEEDED"
+
+        # Silver Phase 4: Feature Engineering
+        - task_key: "silver_features"
+          description: "Engineer 50+ features for ML models"
+          
+          spark_python_task:
+            python_file: "dbfs:/Workspace/${workspace_path}/src/05_silver_derived.py"
+            parameters:
+              - "dbfs:/Workspace/${workspace_path}/src/silver/creditcard_silver_masked"
+              - "dbfs:/Workspace/${workspace_path}/src/silver"
+              - "${environment}"
+          
+          existing_cluster_id: "0422-125216-1t83bm6v"
+          timeout_seconds: 1200
+          max_retries: 2
+          
+          depends_on:
+            - task_key: "silver_mask"
+              outcome: "SUCCEEDED"
+
+      schedule:
+        quartz_cron_expression: "0 45 1 * * ?"  # Daily at 01:45 UTC
+        timezone_id: "UTC"
+        pause_status: "UNPAUSED"
+      
+      max_concurrent_runs: 1
+      timeout_seconds: 7200
+      
+      tags:
+        environment: "${environment}"
+        layer: "silver"
+        pipeline: "creditcard-fraud"

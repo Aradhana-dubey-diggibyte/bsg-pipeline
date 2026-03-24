@@ -1,0 +1,40 @@
+## Ingestion Job - Download from Kaggle
+## Runs first in the pipeline
+
+resources:
+  jobs:
+    ingestion_job:
+      name: "creditcard-${environment}-ingestion"
+      description: "Download Credit Card dataset from Kaggle"
+      
+      tasks:
+        - task_key: "ingest_kaggle"
+          description: "Ingest raw data from Kaggle"
+          
+          notebook_task:
+            notebook_path: "/Workspace/${workspace_path}/src/00_ingest_kaggle.py"
+            base_parameters:
+              output_path: "data/raw"
+              dataset_name: "mlg-ulb/creditcardfraud"
+          
+          existing_cluster_id: "0422-125216-1t83bm6v"  # Use existing cluster
+          
+          timeout_seconds: 3600
+          max_retries: 2
+          
+          email_notifications:
+            on_failure:
+              - "data-engineering@company.com"
+
+      schedule:
+        quartz_cron_expression: "0 0 1 * * ?"  # Monthly on 1st at midnight
+        timezone_id: "UTC"
+        pause_status: "UNPAUSED"
+      
+      max_concurrent_runs: 1
+      timeout_seconds: 7200
+      
+      tags:
+        environment: "${environment}"
+        layer: "ingestion"
+        pipeline: "creditcard-fraud"

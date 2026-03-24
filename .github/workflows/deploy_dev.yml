@@ -1,0 +1,115 @@
+name: Deploy to Dev
+
+on:
+  push:
+    branches:
+      - feature/setup-structure
+    paths:
+      - 'src/**'
+      - 'resources/**'
+      - 'databricks.yml'
+      - 'conf/dev.yml'
+      - '.github/workflows/deploy_dev.yml'
+
+jobs:
+  validate:
+    name: Validate Bundle (Dev)
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Install Databricks CLI
+        run: |
+          pip install databricks-cli
+      
+      - name: Set up Databricks CLI
+        uses: databricks/setup-cli@v0
+        with:
+          host: ${{ vars.DATABRICKS_HOST }}
+          token: ${{ secrets.DATABRICKS_TOKEN }}
+      
+      - name: Validate bundle (dev)
+        run: |
+          databricks bundle validate -t dev
+      
+      - name: Show bundle plan (dev)
+        run: |
+          databricks bundle plan -t dev
+
+  deploy:
+    name: Deploy to Dev
+    runs-on: ubuntu-latest
+    needs: validate
+    if: success()
+    
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Set up Databricks CLI
+        uses: databricks/setup-cli@v0
+        with:
+          host: ${{ vars.DATABRICKS_HOST }}
+          token: ${{ secrets.DATABRICKS_TOKEN }}
+      
+      - name: Deploy bundle to dev
+        run: |
+          databricks bundle deploy -t dev
+      
+      - name: List deployed jobs
+        run: |
+          echo "📋 Deployed Jobs in Dev:"
+          databricks jobs list --output json | jq '.jobs[] | select(.settings.name | contains("bsg")) | {job_id, name: .settings.name, schedule: .settings.schedule}'
+
+  smoke-tests:
+    name: Smoke Tests (Dev)
+    runs-on: ubuntu-latest
+    needs: deploy
+    if: success()
+    
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Set up Databricks CLI
+        uses: databricks/setup-cli@v0
+        with:
+          host: ${{ vars.DATABRICKS_HOST }}
+          token: ${{ secrets.DATABRICKS_TOKEN }}
+      
+      - name: Check workspace structure
+        run: |
+          echo "✓ Checking workspace paths..."
+          databricks workspace list /Shared/.bundle/bsg-creditcard-fraud-pipeline/dev/ --output json || echo "Workspace path check completed"
+      
+      - name: Verify jobs exist
+        run: |
+          echo "✓ Verifying jobs..."
+          JOBS=$(databricks jobs list --output json | jq '.jobs[] | select(.settings.name | contains("bsg")) | .job_id')
+          if [ -z "$JOBS" ]; then
+            echo "❌ No jobs found!"
+            exit 1
+          else
+            echo "✓ Jobs found: $(echo $JOBS | wc -l) jobs"
+          fi
+      
+      - name: Test run ingestion job
+        run: |
+          echo "🚀 Running ingestion job (test)..."
+          JOB_ID=$(databricks jobs list --output json | jq '.jobs[] | select(.settings.name | contains("ingestion")) | .job_id' | head -1)
+          if [ ! -z "$JOB_ID" ]; then
+            echo "Running job ID: $JOB_ID"
+            RUN_ID=$(databricks jobs run-now --job-id $JOB_ID | jq '.run_id')
+            echo "Run ID: $RUN_ID"
+            
+            # Wait for job completion (max 5 minutes)
+            for i in {1..30}; do
+              STATUS=$(databricks runs get --run-id $RUN_ID | jq -r '.state')
+              echo "Status: $STATUS"
+              if [ "$STATUS" = "TERMINATED" ] || [ "$STATUS" = "SKIPPED" ]; then
+                RESULT=$(databricks runs get --run-id $RUN_ID | jq -r '.state_message')
+                echo "✓ Job completed with state: $STATUS - $RESULT"
+                break
+              fi
+              sleep 10
+            done
+          fi

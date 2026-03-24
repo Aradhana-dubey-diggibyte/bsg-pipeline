@@ -1,0 +1,132 @@
+# Production Environment Configuration
+# Used for production deployments and data processing
+
+environment: prod
+
+# Databricks Configuration
+databricks:
+  workspace_url: "https://dbc-629d7ac5-f465.cloud.databricks.com"
+  cluster_id: "0422-125216-1t83bm6v"  # Your existing cluster ID
+  workspace_root: "/Shared/.bundle/bsg-creditcard-fraud-pipeline/prod/${workspace.current_user.userName}"
+  spark_version: "13.3.x-scala2.12"
+  node_type_id: "i3.2xlarge"
+  num_workers: 4
+  autoscale_max_workers: 8
+  
+# Data paths
+data_paths:
+  raw: "dbfs:/Shared/.bundle/bsg-creditcard-fraud-pipeline/prod/${workspace.current_user.userName}/data/raw"
+  bronze: "dbfs:/Shared/.bundle/bsg-creditcard-fraud-pipeline/prod/${workspace.current_user.userName}/data/bronze"
+  silver: "dbfs:/Shared/.bundle/bsg-creditcard-fraud-pipeline/prod/${workspace.current_user.userName}/data/silver"
+  gold: "dbfs:/Shared/.bundle/bsg-creditcard-fraud-pipeline/prod/${workspace.current_user.userName}/data/gold"
+  backups: "dbfs:/Shared/.bundle/bsg-creditcard-fraud-pipeline/prod/${workspace.current_user.userName}/backups"
+
+# Job Configuration
+jobs:
+  ingestion:
+    schedule: "0 0 1 * * ?"  # Monthly first day
+    max_concurrent_runs: 1
+    timeout_seconds: 7200
+    retries: 3
+    email_on_failure: true
+    
+  bronze:
+    schedule: "0 30 1 * * ?"  # Daily at 01:30
+    max_concurrent_runs: 1
+    timeout_seconds: 3600
+    retries: 3
+    email_on_failure: true
+    
+  silver:
+    schedule: "0 45 1 * * ?"  # Daily at 01:45
+    max_concurrent_runs: 2
+    timeout_seconds: 7200
+    retries: 3
+    email_on_failure: true
+    
+  gold:
+    schedule: "0 15 2 * * ?"  # Daily at 02:15
+    max_concurrent_runs: 1
+    timeout_seconds: 5400
+    retries: 2
+    email_on_failure: true
+
+# Airflow Configuration
+airflow:
+  dag_schedule: "0 2 * * *"  # Daily at 02:00 UTC
+  dataflow_schedule: "0 */4 * * *"  # Every 4 hours for monitoring
+  max_active_runs: 2
+  default_retries: 3
+  retry_delay_minutes: 10
+  pool_slots: 10
+
+# Alerting Configuration
+alerts:
+  email:
+    - "prod-alerts@company.com"
+    - "data-engineering-lead@company.com"
+  slack_webhook: "${SLACK_WEBHOOK_PROD}"
+  pagerduty_integration_key: "${PAGERDUTY_KEY}"
+  enable_email: true
+  enable_slack: true
+  enable_pagerduty: true
+  critical_error_escalation: true
+
+# Performance Configuration
+performance:
+  shuffle_partitions: 500
+  default_parallelism: 32
+  memory_fraction: 0.85
+  broadcast_threshold: "2g"
+  optimizer_adaptive_skew_join: true
+
+# Feature Flags
+features:
+  enable_data_quality_checks: true
+  enable_data_profiling: true
+  enable_schema_validation: true
+  enable_pii_masking: true
+  enable_feature_store: true
+  enable_auto_scaling: true
+  enable_optimization: true
+
+# Security
+security:
+  enable_credential_passthrough: true
+  enable_table_access_control: true
+  encryption_enabled: true
+  encryption_algorithm: "AES-256"
+  audit_logging: true
+  
+# Monitoring
+monitoring:
+  enable_metrics: true
+  enable_logging: true
+  enable_tracing: true
+  log_level: "INFO"
+  metrics_destination: "datadog"
+  retention_days: 90
+  enable_dashboards: true
+  
+# Backup & Disaster Recovery
+backup:
+  enabled: true
+  frequency: "daily"
+  retention_days: 30
+  backup_location: "dbfs:/prod/backups"
+  
+# SLA Configuration
+sla:
+  bronze_max_duration_minutes: 60
+  silver_max_duration_minutes: 120
+  gold_max_duration_minutes: 90
+  max_daily_failures: 1
+  
+# Tags
+tags:
+  environment: prod
+  pipeline: creditcard-fraud
+  team: data-engineering
+  cost_center: operations
+  compliance: pci-dss
+  data_classification: sensitive

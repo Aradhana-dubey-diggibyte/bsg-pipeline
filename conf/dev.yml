@@ -1,0 +1,96 @@
+# Development Environment Configuration
+# Used for testing and development builds
+
+environment: dev
+
+# Databricks Configuration
+databricks:
+  workspace_url: "https://adb-7488500312027058.18.azuredatabricks.net"
+  cluster_id: "0422-125216-1t83bm6v"  # Your existing cluster ID
+  workspace_root: "/Shared/.bundle/bsg-creditcard-fraud-pipeline/dev/${workspace.current_user.userName}"
+  spark_version: "13.3.x-scala2.12"
+  node_type_id: "i3.xlarge"
+  num_workers: 2
+  
+# Data paths
+data_paths:
+  raw: "dbfs:/Shared/.bundle/bsg-creditcard-fraud-pipeline/dev/${workspace.current_user.userName}/data/raw"
+  bronze: "dbfs:/Shared/.bundle/bsg-creditcard-fraud-pipeline/dev/${workspace.current_user.userName}/src/bronze"
+  silver: "dbfs:/Shared/.bundle/bsg-creditcard-fraud-pipeline/dev/${workspace.current_user.userName}/src/silver"
+  gold: "dbfs:/Shared/.bundle/bsg-creditcard-fraud-pipeline/dev/${workspace.current_user.userName}/src/gold"
+
+# Job Configuration
+jobs:
+  ingestion:
+    schedule: "0 0 1 * * ?"  # Monthly
+    max_concurrent_runs: 1
+    timeout_seconds: 3600
+    retries: 2
+    
+  bronze:
+    schedule: "0 30 1 * * ?"  # Daily at 01:30
+    max_concurrent_runs: 1
+    timeout_seconds: 1800
+    retries: 2
+    
+  silver:
+    schedule: "0 45 1 * * ?"  # Daily at 01:45
+    max_concurrent_runs: 1
+    timeout_seconds: 4800
+    retries: 2
+    
+  gold:
+    schedule: "0 15 2 * * ?"  # Daily at 02:15
+    max_concurrent_runs: 1
+    timeout_seconds: 3600
+    retries: 1
+
+# Airflow Configuration
+airflow:
+  dag_schedule: "0 2 * * *"  # Daily at 02:00 UTC
+  dataflow_schedule: "0 */6 * * *"  # Every 6 hours for monitoring
+  max_active_runs: 1
+  default_retries: 2
+  retry_delay_minutes: 5
+
+# Alerting Configuration
+alerts:
+  email:
+    - "dev-alerts@company.com"
+  slack_webhook: "${SLACK_WEBHOOK_DEV}"
+  enable_email: true
+  enable_slack: true
+
+# Performance Configuration
+performance:
+  shuffle_partitions: 200
+  default_parallelism: 8
+  memory_fraction: 0.8
+
+# Feature Flags
+features:
+  enable_data_quality_checks: true
+  enable_data_profiling: false
+  enable_schema_validation: true
+  enable_pii_masking: true
+  enable_feature_store: false
+
+# Security
+security:
+  enable_credential_passthrough: false
+  enable_table_access_control: false
+  encryption_enabled: false
+  
+# Monitoring
+monitoring:
+  enable_metrics: true
+  enable_logging: true
+  log_level: "DEBUG"
+  metrics_destination: "cloudwatch"
+  
+# Tags
+tags:
+  environment: dev
+  pipeline: creditcard-fraud
+  team: data-engineering
+  cost_center: engineering

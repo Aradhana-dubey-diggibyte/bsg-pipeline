@@ -1,0 +1,22 @@
+## Databricks Asset Bundle Configuration
+## ETL Pipeline: Credit Card Fraud Detection
+## Targets: Dev and Production environments
+
+bundle:
+  name: bsg-creditcard-fraud-pipeline
+
+include:
+  - ./resources/*.yml
+
+targets:
+  dev:
+    workspace:
+      host: "https://adb-7488500312027058.18.azuredatabricks.net"
+      profile: "DEFAULT"
+      root_path: "/Shared/.bundle/bsg-creditcard-fraud-pipeline/dev/${workspace.current_user.userName}"
+
+  prod:
+    workspace:
+      host: "https://dbc-629d7ac5-f465.cloud.databricks.com"
+      profile: "DEFAULT"
+      root_path: "/Shared/.bundle/bsg-creditcard-fraud-pipeline/prod/${workspace.current_user.userName}"

@@ -1,0 +1,146 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'src/**'
+      - 'resources/**'
+      - 'databricks.yml'
+      - 'conf/prod.yml'
+      - '.github/workflows/deploy_prod.yml'
+
+jobs:
+  deploy:
+    name: Deploy Bundle to Prod
+    runs-on: ubuntu-latest
+    environment: production
+    
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Set up Databricks CLI
+        uses: databricks/setup-cli@v0
+        with:
+          host: ${{ secrets.DATABRICKS_HOST }}
+          token: ${{ secrets.DATABRICKS_TOKEN }}
+      
+      - name: Validate bundle (prod)
+        run: |
+          databricks bundle validate -t prod
+      
+      - name: Show bundle plan (prod)
+        run: |
+          databricks bundle plan -t prod
+      
+      - name: Deploy bundle to prod
+        run: |
+          databricks bundle deploy -t prod
+      
+      - name: Run production jobs
+        run: |
+          echo " Triggering production pipeline..."
+          databricks jobs run-now --job-id $(databricks jobs list --output json | jq '.jobs[] | select(.settings.name | contains("prod-ingestion")) | .job_id' | head -1)
+
+  smoke-tests:
+    name: Smoke Tests (Prod)
+    runs-on: ubuntu-latest
+    needs: deploy
+    if: success()
+    
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Set up Databricks CLI
+        uses: databricks/setup-cli@v0
+        with:
+          host: ${{ secrets.DATABRICKS_HOST }}
+          token: ${{ secrets.DATABRICKS_TOKEN }}
+      
+      - name: Check bronze layer
+        run: |
+          databricks fs ls /Shared/.bundle/bsg-creditcard-fraud-pipeline/prod/${workspace.current_user.userName}/src/bronze/
+      
+      - name: Check silver layer
+        run: |
+          databricks fs ls /Shared/.bundle/bsg-creditcard-fraud-pipeline/prod/${workspace.current_user.userName}/src/silver/
+      
+      - name: Check gold layer
+        run: |
+          databricks fs ls /Shared/.bundle/bsg-creditcard-fraud-pipeline/prod/${workspace.current_user.userName}/src/gold/
+
+  notify:
+    name: Notify Deployment
+    runs-on: ubuntu-latest
+    needs: [deploy, smoke-tests]
+    if: always()
+    
+    steps:
+      - name: Send Slack notification (Success)
+        if: success()
+        uses: slackapi/slack-github-action@v1
+        with:
+          webhook-url: ${{ secrets.SLACK_WEBHOOK }}
+          payload: |
+            {
+              "text": " Production deployment successful",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*Production Deployment Successful* 🚀\n*Pipeline:* Credit Card Fraud Detection\n*Environment:* Production\n*Commit:* ${{ github.sha }}\n*Author:* ${{ github.actor }}"
+                  }
+                }
+              ]
+            }
+      
+      - name: Send Slack notification (Failure)
+        if: failure()
+        uses: slackapi/slack-github-action@v1
+        with:
+          webhook-url: ${{ secrets.SLACK_WEBHOOK }}
+          payload: |
+            {
+              "text": " Production deployment failed",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*Production Deployment Failed* ❌\n*Pipeline:* Credit Card Fraud Detection\n*Environment:* Production\n*Commit:* ${{ github.sha }}\n*Author:* ${{ github.actor }}\n*Check logs:* ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+                  }
+                }
+              ]
+            }
+
+  rollback:
+    name: Rollback (on failure)
+    runs-on: ubuntu-latest
+    needs: [deploy]
+    if: failure()
+    
+    steps:
+      - name: Check previous version
+        run: |
+          echo " Rollback procedure initiated"
+          echo "To rollback: databricks bundle deploy -t prod --from-job-run <previous_run_id>"
+      
+      - name: Send Alert
+        uses: slackapi/slack-github-action@v1
+        with:
+          webhook-url: ${{ secrets.SLACK_WEBHOOK }}
+          payload: |
+            {
+              "text": " Rollback initiated",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*Rollback Initiated* ⚠️\n*Pipeline:* Credit Card Fraud Detection\n*Environment:* Production\n*Action:* Manual rollback required"
+                  }
+                }
+              ]
+            }

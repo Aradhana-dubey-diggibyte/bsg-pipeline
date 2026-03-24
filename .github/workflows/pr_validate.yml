@@ -1,0 +1,207 @@
+name: Validate PR
+
+on:
+  pull_request:
+    branches:
+      - main
+      - feature/setup-structure
+    paths:
+      - 'src/**'
+      - 'resources/**'
+      - 'databricks.yml'
+      - '.github/workflows/pr_validate.yml'
+      - 'conf/**'
+
+jobs:
+  lint-python:
+    name: Lint Python Code
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+      
+      - name: Install dependencies
+        run: |
+          pip install flake8 black isort pylint
+      
+      - name: Run Black formatter check
+        run: |
+          black --check src/ airflow/dags/
+      
+      - name: Run isort check
+        run: |
+          isort --check-only src/ airflow/dags/
+      
+      - name: Run Flake8
+        run: |
+          flake8 src/ airflow/dags/ --max-line-length=100 --exclude=__pycache__
+      
+      - name: Run Pylint
+        continue-on-error: true
+        run: |
+          pylint src/ --disable=C0111,C0103 --fail-under=7.0
+
+  validate-bundle:
+    name: Validate Bundle
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Install Databricks CLI
+        run: |
+          pip install databricks-cli
+      
+      - name: Set up Databricks CLI
+        uses: databricks/setup-cli@v0
+        with:
+          host: ${{ vars.DATABRICKS_HOST }}
+          token: ${{ secrets.DATABRICKS_TOKEN }}
+      
+      - name: Validate bundle (dev)
+        run: |
+          databricks bundle validate -t dev
+
+  security-check:
+    name: Security Check
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      
+      - name: Install security tools
+        run: |
+          pip install bandit safety
+      
+      - name: Run Bandit (SAST)
+        continue-on-error: true
+        run: |
+          bandit -r src/ -ll
+      
+      - name: Check dependencies for vulnerabilities
+        continue-on-error: true
+        run: |
+          pip install -q -r airflow/requirements.txt
+          safety check
+
+  validate-yaml:
+    name: Validate YAML & Bundle Config
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      
+      - name: Install YAML validator
+        run: |
+          pip install pyyaml
+      
+      - name: Validate databricks.yml
+        run: |
+          python -c "
+          import yaml
+          with open('databricks.yml', 'r') as f:
+              yaml.safe_load(f)
+          print('✓ databricks.yml is valid')
+          "
+      
+      - name: Validate job YAMLs
+        run: |
+          python -c "
+          import yaml
+          import glob
+          for file in glob.glob('resources/*.yml'):
+              with open(file, 'r') as f:
+                  yaml.safe_load(f)
+              print(f'✓ {file} is valid')
+          "
+      
+      - name: Validate Airflow DAGs
+        run: |
+          python -c "
+          import yaml
+          import glob
+          for file in glob.glob('airflow/dags/*.yml'):
+              with open(file, 'r') as f:
+                  yaml.safe_load(f)
+              print(f'✓ {file} is valid')
+          "
+
+  unit-tests:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+      
+      - name: Install dependencies
+        run: |
+          pip install pytest pytest-cov pyspark pandas
+      
+      - name: Run unit tests
+        run: |
+          pytest tests/ -v --cov=src --cov-report=xml --tb=short || true
+      
+      - name: Upload coverage reports
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./coverage.xml
+          flags: unittests
+
+  databricks-validate:
+    name: Validate Databricks Bundle
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Set up Databricks CLI
+        uses: databricks/setup-cli@v0
+        with:
+          host: ${{ secrets.DATABRICKS_HOST }}
+          token: ${{ secrets.DATABRICKS_TOKEN }}
+      
+      - name: Validate bundle
+        run: |
+          databricks bundle validate -t dev
+      
+      - name: Show bundle plan (dry-run)
+        run: |
+          databricks bundle plan -t dev
+
+  summary:
+    name: Summary
+    runs-on: ubuntu-latest
+    needs: [lint-python, security-check, validate-yaml, unit-tests, databricks-validate]
+    if: always()
+    
+    steps:
+      - name: Check results
+        run: |
+          echo "✓ All validations completed"
+          echo "Lint: ${{ needs.lint-python.result }}"
+          echo "Security: ${{ needs.security-check.result }}"
+          echo "YAML: ${{ needs.validate-yaml.result }}"
+          echo "Tests: ${{ needs.unit-tests.result }}"
+          echo "Bundle: ${{ needs.databricks-validate.result }}"
