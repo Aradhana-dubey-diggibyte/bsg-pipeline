@@ -7,10 +7,9 @@ bundle:
 
 include:
   - ./resources/pipeline_job.yml
-
 sync:
   include:
-    - ./src
+    - ./src**
     - ./conf
 
 variables:
@@ -33,12 +32,12 @@ targets:
       profile: "DEFAULT"
       root_path: "/Shared/.bundle/bsg-creditcard-fraud-pipeline/dev/${workspace.current_user.userName}"
 
-  prod:
-    variables:
-      environment: "prod"
-      workspace_path: "Shared/.bundle/bsg-creditcard-fraud-pipeline/prod"
+  #prod:
+    #variables:
+      #environment: "prod"
+      #workspace_path: "Shared/.bundle/bsg-creditcard-fraud-pipeline/prod"
     
-    workspace:
-      host: "https://dbc-629d7ac5-f465.cloud.databricks.com"
-      profile: "DEFAULT"
-      root_path: "/Shared/.bundle/bsg-creditcard-fraud-pipeline/prod/${workspace.current_user.userName}"
+    #workspace:
+      #host: "https://dbc-629d7ac5-f465.cloud.databricks.com"
+      #profile: "DEFAULT"
+      #root_path: "/Shared/.bundle/bsg-creditcard-fraud-pipeline/prod/${workspace.current_user.userName}"
