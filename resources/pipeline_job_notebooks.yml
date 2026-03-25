@@ -14,7 +14,7 @@ resources:
           description: "Ingest raw data from Kaggle"
           
           notebook_task:
-            notebook_path: "/Workspace/Shared/.bundle/bsg-creditcard-fraud-pipeline/${var.environment}/${workspace.current_user.userName}/files/src/00_ingest_kaggle"
+            notebook_path: "/Repos/${workspace.current_user.userName}/bsg-pipeline/src/00_ingest_kaggle"
             base_parameters:
               dataset_name: "mlg-ulb/creditcardfraud"
           
@@ -27,7 +27,7 @@ resources:
           description: "Load raw CSV, validate schema, store as Delta table"
           
           notebook_task:
-            notebook_path: "/Workspace/Shared/.bundle/bsg-creditcard-fraud-pipeline/${var.environment}/${workspace.current_user.userName}/files/src/01_bronze_schema"
+            notebook_path: "/Repos/${workspace.current_user.userName}/bsg-pipeline/src/01_bronze"
           
           existing_cluster_id: "0422-125216-1t83bm6v"
           timeout_seconds: 1800
@@ -42,7 +42,7 @@ resources:
           description: "Remove duplicate transactions"
           
           notebook_task:
-            notebook_path: "/Workspace/Shared/.bundle/bsg-creditcard-fraud-pipeline/${var.environment}/${workspace.current_user.userName}/files/src/02_silver_dedup"
+            notebook_path: "/Repos/${workspace.current_user.userName}/bsg-pipeline/src/05_silver"
           
           existing_cluster_id: "0422-125216-1t83bm6v"
           timeout_seconds: 900

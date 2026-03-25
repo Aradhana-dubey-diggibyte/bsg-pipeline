@@ -13,7 +13,7 @@ resources:
           description: "Ingest data from Kaggle and perform bronze-level transformation"
           
           notebook_task:
-            notebook_path: "/Workspace/Shared/.bundle/bsg-creditcard-fraud-pipeline/${var.environment}/${workspace.current_user.userName}/files/src/01_bronze.ipynb"
+            notebook_path: "/Repos/${workspace.current_user.userName}/bsg-pipeline/src/01_bronze"
           
           existing_cluster_id: "0422-125216-1t83bm6v"
           timeout_seconds: 3600
@@ -24,7 +24,7 @@ resources:
           description: "Execute all silver transformations: dedup → standardize → mask → features"
           
           notebook_task:
-            notebook_path: "/Workspace/Shared/.bundle/bsg-creditcard-fraud-pipeline/${var.environment}/${workspace.current_user.userName}/files/src/05_silver.ipynb"
+            notebook_path: "/Repos/${workspace.current_user.userName}/bsg-pipeline/src/05_silver"
           
           existing_cluster_id: "0422-125216-1t83bm6v"
           timeout_seconds: 1800
@@ -38,7 +38,7 @@ resources:
           description: "Execute all gold tasks: risk scoring → metrics → KPI mart"
           
           notebook_task:
-            notebook_path: "/Workspace/Shared/.bundle/bsg-creditcard-fraud-pipeline/${var.environment}/${workspace.current_user.userName}/files/src/08_gold.ipynb"
+            notebook_path: "/Repos/${workspace.current_user.userName}/bsg-pipeline/src/08_gold"
           
           existing_cluster_id: "0422-125216-1t83bm6v"
           timeout_seconds: 1200
