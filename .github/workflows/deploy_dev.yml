@@ -24,7 +24,7 @@ jobs:
           pip install databricks-cli
       
       - name: Set up Databricks CLI
-        uses: databricks/setup-cli@v0
+        uses: databricks/setup-cli@v0.0
         with:
           host: ${{ vars.DATABRICKS_HOST }}
           token: ${{ secrets.DATABRICKS_TOKEN }}
