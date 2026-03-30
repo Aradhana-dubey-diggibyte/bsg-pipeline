@@ -62,5 +62,3 @@ data/raw/*
 
 # Logs
 *.log
-#data
-data/
